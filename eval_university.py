@@ -18,7 +18,7 @@ class Configuration:
     img_size: int = 384
     
     # Evaluation
-    batch_size: int = 128
+    batch_size: int = 32
     verbose: bool = True
     gpu_ids: tuple = (0,)
     normalize_features: bool = True
@@ -29,7 +29,7 @@ class Configuration:
     data_folder: str = "./data/U1652"
     
     # Checkpoint to start from
-    checkpoint_start = 'pretrained/university/convnext_base.fb_in22k_ft_in1k_384/weights_e1_0.9515.pth'
+    checkpoint_start = 'pretrained/pretrained/university/convnext_base.fb_in22k_ft_in1k_384/weights_e1_0.9515.pth'
   
     # set num_workers to 0 if on Windows
     num_workers: int = 0 if os.name == 'nt' else 4 
@@ -45,10 +45,10 @@ class Configuration:
 config = Configuration() 
 
 if config.dataset == 'U1652-D2S':
-    config.query_folder_train = './data/U1652/train/satellite'
-    config.gallery_folder_train = './data/U1652/train/drone'   
-    config.query_folder_test = './data/U1652/test/query_drone' 
-    config.gallery_folder_test = './data/U1652/test/gallery_satellite'    
+    config.query_folder_train = '/gpfs2/scratch/xzhang31/university-1652/University-1652/train/satellite'
+    config.gallery_folder_train = '/gpfs2/scratch/xzhang31/university-1652/University-1652/train/drone'   
+    config.query_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652WX/query_drone160k_wx' 
+    config.gallery_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652WX/gallery_satellite_160k'   
 elif config.dataset == 'U1652-S2D':
     config.query_folder_train = './data/U1652/train/satellite'
     config.gallery_folder_train = './data/U1652/train/drone'    

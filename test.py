@@ -2,15 +2,15 @@ import os
 import torch
 from dataclasses import dataclass
 from torch.utils.data import DataLoader
-
-from sample4geo.dataset.university import U1652DatasetEval, get_transforms
-from sample4geo.evaluate.university import evaluate
+import numpy as np
+from sample4geo.dataset.university import U1652DatasetEval, get_transforms, CustomDataset
 from sample4geo.model import TimmModel
+from sample4geo.trainer import predict
+
 
 
 @dataclass
 class Configuration:
-
     # Model
     model: str = 'convnext_base.fb_in22k_ft_in1k_384'
     
@@ -18,14 +18,14 @@ class Configuration:
     img_size: int = 384
     
     # Evaluation
-    batch_size: int = 32
+    batch_size: int = 16
     verbose: bool = True
     gpu_ids: tuple = (0,)
     normalize_features: bool = True
-    eval_gallery_n: int = -1             # -1 for all or int
+    eval_gallery_n: int = -1  # -1 for all or int
     
     # Dataset
-    dataset: str = 'U1652-D2S'           # 'U1652-D2S' | 'U1652-S2D'
+    dataset: str = 'U1652-D2S'  # 'U1652-D2S' | 'U1652-S2D'
     data_folder: str = "./data/U1652"
     
     # Checkpoint to start from
@@ -36,7 +36,6 @@ class Configuration:
     
     # train on GPU if available
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu' 
-    
 
 #-----------------------------------------------------------------------------#
 # Config                                                                      #
@@ -56,37 +55,35 @@ elif config.dataset == 'U1652-S2D':
     config.gallery_folder_test = './data/U1652/test/gallery_drone'
 
 
-if __name__ == '__main__':
+def predict_top_k(query_features, gallery_features, k=10):
+    similarities = torch.matmul(query_feature, gallery_features.t())
+    top_k_indices = torch.argsort(similarities, descending=True)[:10]
+    return top_k_indices
 
+if __name__ == '__main__':
     #-----------------------------------------------------------------------------#
     # Model                                                                       #
     #-----------------------------------------------------------------------------#
-        
     print("\nModel: {}".format(config.model))
 
-
-    model = TimmModel(config.model,
-                          pretrained=True,
-                          img_size=config.img_size)
-                          
+    model = TimmModel(config.model, pretrained=True, img_size=config.img_size)
     data_config = model.get_config()
     print(data_config)
     mean = data_config["mean"]
     std = data_config["std"]
     img_size = (config.img_size, config.img_size)
-    
 
-    # load pretrained Checkpoint    
+    # Load pretrained Checkpoint    
     if config.checkpoint_start is not None:  
         print("Start from:", config.checkpoint_start)
         model_state_dict = torch.load(config.checkpoint_start)  
-        model.load_state_dict(model_state_dict, strict=False)     
+        model.load_state_dict(model_state_dict, strict=False)
 
     # Data parallel
     print("GPUs available:", torch.cuda.device_count())  
     if torch.cuda.device_count() > 1 and len(config.gpu_ids) > 1:
         model = torch.nn.DataParallel(model, device_ids=config.gpu_ids)
-            
+
     # Model to device   
     model = model.to(config.device)
 
@@ -95,52 +92,57 @@ if __name__ == '__main__':
     print("Mean: {}".format(mean))
     print("Std:  {}\n".format(std)) 
 
-
     #-----------------------------------------------------------------------------#
     # DataLoader                                                                  #
     #-----------------------------------------------------------------------------#
 
     # Transforms
-    val_transforms, train_sat_transforms, train_drone_transforms = get_transforms(img_size, mean=mean, std=std)
-                                                                                                                                 
+    val_transforms, _, _ = get_transforms(img_size, mean=mean, std=std)
     
     # Reference Satellite Images
-    query_dataset_test = U1652DatasetEval(data_folder=config.query_folder_test,
-                                               mode="query",
-                                               transforms=val_transforms,
-                                               )
+    '''query_dataset_test = U1652DatasetEval(data_folder=config.query_folder_test,
+                                          mode="query",
+                                          transforms=val_transforms)'''
+
+    query_dataset_test = CustomDataset(data_folder=config.query_folder_test, transforms=val_transforms)
     
     query_dataloader_test = DataLoader(query_dataset_test,
                                        batch_size=config.batch_size,
                                        num_workers=config.num_workers,
                                        shuffle=False,
-                                       pin_memory=True)
+                                       pin_memory=False)
     
     # Query Ground Images Test
-    gallery_dataset_test = U1652DatasetEval(data_folder=config.gallery_folder_test,
-                                               mode="gallery",
-                                               transforms=val_transforms,
-                                               sample_ids=query_dataset_test.get_sample_ids(),
-                                               gallery_n=config.eval_gallery_n,
-                                               )
+    '''gallery_dataset_test = U1652DatasetEval(data_folder=config.gallery_folder_test,
+                                            mode="gallery",
+                                            transforms=val_transforms,
+                                            sample_ids=query_dataset_test.get_sample_ids(),
+                                            gallery_n=config.eval_gallery_n)'''
+
+    gallery_dataset_test = CustomDataset(data_folder=config.gallery_folder_test, transforms=val_transforms)
+
     
     gallery_dataloader_test = DataLoader(gallery_dataset_test,
-                                       batch_size=config.batch_size,
-                                       num_workers=config.num_workers,
-                                       shuffle=False,
-                                       pin_memory=True)
+                                         batch_size=config.batch_size,
+                                         num_workers=config.num_workers,
+                                         shuffle=False,
+                                         pin_memory=False)
     
     print("Query Images Test:", len(query_dataset_test))
     print("Gallery Images Test:", len(gallery_dataset_test))
-   
 
-    print("\n{}[{}]{}".format(30*"-", "University-1652", 30*"-"))  
+    # Extract features
+    print("Extract Features:")
+    query_features, ids_query = predict(config, model, query_dataloader_test)
+    gallery_features, ids_gallery = predict(config, model, gallery_dataloader_test)
 
-    r1_test = evaluate(config=config,
-                       model=model,
-                       query_loader=query_dataloader_test,
-                       gallery_loader=gallery_dataloader_test, 
-                       ranks=[1, 5, 10],
-                       step_size=1000,
-                       cleanup=True)
- 
+    # Predict top 10
+    top_10_indices = predict_top_k(query_features, gallery_features, k=10)
+
+    # Save results to file
+    gallery_paths = np.array([path for path, _ in gallery_dataset_test.imgs])
+    with open('answer.txt', 'w') as f:
+        for indices in top_10_indices:
+            f.write('\t'.join(gallery_paths[indices]) + '\n')
+
+    print("Top 10 predictions saved to answer.txt")

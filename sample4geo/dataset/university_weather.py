@@ -10,6 +10,7 @@ from tqdm import tqdm
 import time
 import random
 
+
 def get_data(path):
     data = {}
     for root, dirs, files in os.walk(path, topdown=False):
@@ -27,7 +28,7 @@ class U1652DatasetTrain(Dataset):
                  gallery_folder,
                  transforms_query=None,
                  transforms_gallery=None,
-                 prob_flip=0.5, prob_weather=0.5,
+                 prob_flip=0.5, prob_weather=0.8,
                  shuffle_batch_size=32):
         super().__init__()
  
@@ -57,6 +58,7 @@ class U1652DatasetTrain(Dataset):
         self.prob_flip = prob_flip
         self.prob_weather = prob_weather
         self.shuffle_batch_size = shuffle_batch_size
+        self.saved_count = 0  # Counter to keep track of saved images
         
         self.samples = copy.deepcopy(self.pairs)
 
@@ -93,6 +95,14 @@ class U1652DatasetTrain(Dataset):
         if np.random.random() < self.prob_weather:
             aug = random.choice(self.augmentation_sequences)
             gallery_img = aug(image=gallery_img)
+           
+
+            # Save augmented gallery images for checking
+            if self.saved_count < 3:  # Save only 3 images
+                save_path = os.path.join("/gpfs2/scratch/aabulehy/geo_weather", f"gallery_aug_{self.saved_count}.jpg")
+                cv2.imwrite(save_path, cv2.cvtColor(gallery_img, cv2.COLOR_RGB2BGR))
+                self.saved_count += 1
+               
         
         # image transforms
         if self.transforms_query is not None:

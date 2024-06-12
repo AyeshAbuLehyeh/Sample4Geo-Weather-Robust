@@ -204,8 +204,7 @@ class U1652DatasetEval(Dataset):
                 
                 self.sample_ids.append(sample_id) 
                     
-  
-            
+           
         
         
     def __getitem__(self, index):
@@ -246,8 +245,29 @@ class U1652DatasetEval(Dataset):
     
     def get_sample_ids(self):
         return set(self.sample_ids)
-    
-    
+
+
+class CustomDataset(Dataset):
+    def __init__(self, data_folder, transforms=None):
+        self.data_folder = data_folder
+        self.transforms = transforms
+        self.image_files = sorted(os.listdir(data_folder))
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+        img_name = os.path.join(self.data_folder, self.image_files[idx])
+        img = cv2.imread(img_name)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        if self.transforms:
+            img = self.transforms(image=img)['image']
+
+        return img, idx  # Return index as label since labels are not known
+
+
+
 def get_transforms(img_size,
                    mean=[0.485, 0.456, 0.406],
                    std=[0.229, 0.224, 0.225]):

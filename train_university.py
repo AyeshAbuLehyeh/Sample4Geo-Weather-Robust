@@ -9,7 +9,7 @@ from torch.cuda.amp import GradScaler
 from torch.utils.data import DataLoader
 from transformers import get_constant_schedule_with_warmup, get_polynomial_decay_schedule_with_warmup, get_cosine_schedule_with_warmup
 
-from sample4geo.dataset.university import U1652DatasetEval, U1652DatasetTrain, get_transforms
+from sample4geo.dataset.university_weather import U1652DatasetEval, U1652DatasetTrain, get_transforms
 from sample4geo.utils import setup_system, Logger
 from sample4geo.trainer import train
 from sample4geo.evaluate.university import evaluate
@@ -30,7 +30,7 @@ class Configuration:
     mixed_precision: bool = True
     custom_sampling: bool = True         # use custom sampling instead of random
     seed = 1
-    epochs: int = 1
+    epochs: int = 40
     batch_size: int = 32                # keep in mind real_batch_size = 2 * batch_size
     verbose: bool = True
     gpu_ids: tuple = (0,1,2,3)           # GPU ids for training
@@ -52,7 +52,7 @@ class Configuration:
     # Learning Rate
     lr: float = 0.001                    # 1 * 10^-4 for ViT | 1 * 10^-1 for CNN
     scheduler: str = "cosine"           # "polynomial" | "cosine" | "constant" | None
-    warmup_epochs: int = 0.1
+    warmup_epochs: int = 1
     lr_end: float = 0.0001               #  only for "polynomial"
     
     # Dataset
@@ -63,7 +63,7 @@ class Configuration:
     prob_flip: float = 0.5              # flipping the sat image and drone image simultaneously
 
     # Augment Images weather
-    prob_weather: float = 0.5              
+    prob_weather: float = 0.8              
     
     # Savepath for model checkpoints
     model_path: str = "./university"
@@ -97,8 +97,10 @@ config = Configuration()
 if config.dataset == 'U1652-D2S':
     config.query_folder_train = '/gpfs2/scratch/xzhang31/university-1652/University-1652/train/satellite'
     config.gallery_folder_train = '/gpfs2/scratch/xzhang31/university-1652/University-1652/train/drone'   
-    config.query_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652WX/query_drone160k_wx' 
-    config.gallery_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652WX/gallery_satellite_160k'  
+    config.query_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652/test/query_drone' 
+    config.gallery_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652/test/gallery_satellite'  
+    #config.query_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652WX/query_drone160k_wx' 
+    #config.gallery_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652WX/gallery_satellite_160k'
 elif config.dataset == 'U1652-S2D':
     config.query_folder_train = './data/U1652/train/satellite'
     config.gallery_folder_train = './data/U1652/train/drone'    
@@ -114,7 +116,13 @@ if __name__ == '__main__':
 
     if not os.path.exists(model_path):
         os.makedirs(model_path)
-    shutil.copyfile(os.path.basename(__file__), "{}/train.py".format(model_path))
+    #shutil.copyfile(os.path.basename(__file__), "{}/train.py".format(model_path))
+
+    # Get the absolute path of the current script
+    script_path = os.path.abspath(__file__)
+
+    # Copy the current script to the model directory
+    shutil.copyfile(script_path, "{}/train.py".format(model_path))
 
     # Redirect print to both console and log file
     sys.stdout = Logger(os.path.join(model_path, 'log.txt'))
@@ -177,7 +185,7 @@ if __name__ == '__main__':
                                       transforms_query=train_sat_transforms,
                                       transforms_gallery=train_drone_transforms,
                                       prob_flip=config.prob_flip,
-                                      prob_weather=conf.prob_weather,
+                                      prob_weather=config.prob_weather,
                                       shuffle_batch_size=config.batch_size,
                                       )
     

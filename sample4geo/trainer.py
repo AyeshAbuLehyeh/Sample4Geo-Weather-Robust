@@ -141,11 +141,18 @@ def predict(train_config, model, dataloader):
                     img_feature = F.normalize(img_feature, dim=-1)
             
             # save features in fp32 for sim calculation
-            img_features_list.append(img_feature.to(torch.float32))
+            #img_features_list.append(img_feature.to(torch.float32))
+
+            # Move features to CPU and append to the list
+            img_features_list.append(img_feature.cpu().to(torch.float32))
       
-        # keep Features on GPU
+        '''# keep Features on GPU
         img_features = torch.cat(img_features_list, dim=0) 
-        ids_list = torch.cat(ids_list, dim=0).to(train_config.device)
+        ids_list = torch.cat(ids_list, dim=0).to(train_config.device)'''
+
+        # Move features to CPU
+        img_features = torch.cat(img_features_list, dim=0)
+        ids_list = torch.cat(ids_list, dim=0).to('cpu')
         
     if train_config.verbose:
         bar.close()

@@ -29,7 +29,7 @@ class Configuration:
     data_folder: str = "./data/U1652"
     
     # Checkpoint to start from
-    checkpoint_start = 'pretrained/pretrained/university/convnext_base.fb_in22k_ft_in1k_384/weights_e1_0.9515.pth'
+    checkpoint_start = 'university/convnext_base.fb_in22k_ft_in1k_384/123000/weights_end.pth'
   
     # set num_workers to 0 if on Windows
     num_workers: int = 0 if os.name == 'nt' else 4 
@@ -140,6 +140,8 @@ if __name__ == '__main__':
     query_features, ids_query = predict(config, model, query_dataloader_test)
     gallery_features, ids_gallery = predict(config, model, gallery_dataloader_test)
 
+
+
     # Predict top 10
     top_10_indices = predict_top_k(query_features, gallery_features, k=10)
 
@@ -147,9 +149,9 @@ if __name__ == '__main__':
     gallery_filenames = np.array(gallery_dataset_test.image_files)
     gallery_filenames_no_ext = np.array([os.path.splitext(filename)[0] for filename in gallery_filenames])
 
-    with open('answer.txt', 'w') as f:
+    with open('answer05.txt', 'w') as f:
         for indices in top_10_indices:
             top_10_filenames = '\t'.join(gallery_filenames_no_ext[indices].tolist())
             f.write(f"{top_10_filenames}\n")
 
-    print("Top 10 predictions saved to answer.txt")
+    print("Top 10 predictions saved to answer05.txt")

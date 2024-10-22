@@ -248,10 +248,14 @@ class U1652DatasetEval(Dataset):
 
 
 class CustomDataset(Dataset):
-    def __init__(self, data_folder, transforms=None):
+    def __init__(self, data_folder, image_files=None, transforms=None):
         self.data_folder = data_folder
         self.transforms = transforms
-        self.image_files = sorted(os.listdir(data_folder))
+        if image_files is not None:
+            self.image_files = image_files
+        else:
+            self.image_files = sorted(os.listdir(data_folder))
+
 
     def __len__(self):
         return len(self.image_files)

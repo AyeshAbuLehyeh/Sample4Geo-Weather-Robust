@@ -3,7 +3,7 @@ import torch
 from dataclasses import dataclass
 from torch.utils.data import DataLoader
 
-from sample4geo.dataset.university import U1652DatasetEval, get_transforms
+from sample4geo.dataset.university_weather import U1652DatasetEval, get_transforms
 from sample4geo.evaluate.university import evaluate
 from sample4geo.model import TimmModel
 
@@ -26,13 +26,13 @@ class Configuration:
     
     # Dataset
     dataset: str = 'U1652-D2S'           # 'U1652-D2S' | 'U1652-S2D'
-    data_folder: str = "./data/U1652"
+    data_folder: str = "/gpfs2/scratch/xzhang31/university-1652"
     
     # Checkpoint to start from
-    checkpoint_start = 'pretrained/pretrained/university/convnext_base.fb_in22k_ft_in1k_384/weights_e1_0.9515.pth'
+    checkpoint_start = '/gpfs2/scratch/aabulehy/geo_weather/pretrained/pretrained/university/convnext_base.fb_in22k_ft_in1k_384/weights_e1_0.9515.pth'
   
     # set num_workers to 0 if on Windows
-    num_workers: int = 0 if os.name == 'nt' else 4 
+    num_workers: int = 0
     
     # train on GPU if available
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu' 
@@ -43,12 +43,13 @@ class Configuration:
 #-----------------------------------------------------------------------------#
 
 config = Configuration() 
-
+# query_loader=query_dataloader_test,
+# gallery_loader=gallery_dataloader_test,
 if config.dataset == 'U1652-D2S':
     config.query_folder_train = '/gpfs2/scratch/xzhang31/university-1652/University-1652/train/satellite'
     config.gallery_folder_train = '/gpfs2/scratch/xzhang31/university-1652/University-1652/train/drone'   
-    config.query_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652WX/query_drone160k_wx/query_drone_160k_wx_24' 
-    config.gallery_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652WX/gallery_satellite_160k'   
+    config.query_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652/test/query_drone'
+    config.gallery_folder_test = '/gpfs2/scratch/xzhang31/university-1652/University-1652/test/gallery_satellite'
 elif config.dataset == 'U1652-S2D':
     config.query_folder_train = './data/U1652/train/satellite'
     config.gallery_folder_train = './data/U1652/train/drone'    
@@ -79,17 +80,20 @@ if __name__ == '__main__':
     # load pretrained Checkpoint    
     if config.checkpoint_start is not None:  
         print("Start from:", config.checkpoint_start)
-        model_state_dict = torch.load(config.checkpoint_start)  
+        if torch.cuda.is_available():
+            model_state_dict = torch.load(config.checkpoint_start)
+        else:
+            model_state_dict = torch.load(config.checkpoint_start,map_location=torch.device('cpu'))
         model.load_state_dict(model_state_dict, strict=False)     
 
     # Data parallel
     print("GPUs available:", torch.cuda.device_count())  
-    if torch.cuda.device_count() > 1 and len(config.gpu_ids) > 1:
-        model = torch.nn.DataParallel(model, device_ids=config.gpu_ids)
+    # if torch.cuda.device_count() > 1 and len(config.gpu_ids) > 1:
+    #     model = torch.nn.DataParallel(model, device_ids=config.gpu_ids)
             
     # Model to device   
     model = model.to(config.device)
-
+    # model = model.to('cpu')
     print("\nImage Size Query:", img_size)
     print("Image Size Ground:", img_size)
     print("Mean: {}".format(mean))
@@ -105,6 +109,7 @@ if __name__ == '__main__':
                                                                                                                                  
     
     # Reference Satellite Images
+    print("config.query_folder_test:",config.query_folder_test)
     query_dataset_test = U1652DatasetEval(data_folder=config.query_folder_test,
                                                mode="query",
                                                transforms=val_transforms,
@@ -136,11 +141,13 @@ if __name__ == '__main__':
 
     print("\n{}[{}]{}".format(30*"-", "University-1652", 30*"-"))  
 
-    r1_test = evaluate(config=config,
+    r1_test,_ = evaluate(config=config,
                        model=model,
                        query_loader=query_dataloader_test,
                        gallery_loader=gallery_dataloader_test, 
                        ranks=[1, 5, 10],
                        step_size=1000,
                        cleanup=True)
+    with open('result-without weather.txt', 'w') as f:
+        f.write("r1:"+f"{r1_test}\n")
  

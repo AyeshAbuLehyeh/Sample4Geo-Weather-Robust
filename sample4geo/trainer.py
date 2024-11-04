@@ -118,8 +118,10 @@ def predict(train_config, model, dataloader):
     time.sleep(0.1)
     
     if train_config.verbose:
+        print("Verbose------")
         bar = tqdm(dataloader, total=len(dataloader))
     else:
+        print("no verbose------------")
         bar = dataloader
         
     img_features_list = []

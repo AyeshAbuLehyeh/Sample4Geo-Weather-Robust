@@ -55,7 +55,7 @@ def evaluate(config,
         gc.collect()
         #torch.cuda.empty_cache()
     
-    return CMC[0]
+    return CMC[0],CMC
 
 
 def eval_query(qf,ql,gf,gl):

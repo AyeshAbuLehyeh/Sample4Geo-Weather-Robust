@@ -28,7 +28,7 @@ class U1652DatasetTrain(Dataset):
                  gallery_folder,
                  transforms_query=None,
                  transforms_gallery=None,
-                 prob_flip=0.5, prob_weather=0.8,
+                 prob_flip=0.5, prob_weather=1.0,
                  shuffle_batch_size=32):
         super().__init__()
  
@@ -74,7 +74,8 @@ class U1652DatasetTrain(Dataset):
             iaa.Multiply((1.5, 2)),
             iaa.MotionBlur(k=(7, 10), angle=[-90, 90])
         ]
-        
+
+
     def __getitem__(self, index):
         
         idx, query_img_path, gallery_img_path = self.samples[index]
@@ -95,13 +96,14 @@ class U1652DatasetTrain(Dataset):
         if np.random.random() < self.prob_weather:
             aug = random.choice(self.augmentation_sequences)
             gallery_img = aug(image=gallery_img)
-           
 
-            # Save augmented gallery images for checking
-            if self.saved_count < 3:  # Save only 3 images
-                save_path = os.path.join("/gpfs2/scratch/aabulehy/geo_weather", f"gallery_aug_{self.saved_count}.jpg")
-                cv2.imwrite(save_path, cv2.cvtColor(gallery_img, cv2.COLOR_RGB2BGR))
-                self.saved_count += 1
+
+            # # Save augmented gallery images for checking
+            # if self.saved_count < 3:  # Save only 3 images
+            #     print("gallery_img_path:",gallery_img_path)
+            #     save_path = os.path.join("/gpfs2/scratch/ychen57", f"gallery_aug_{self.saved_count}.jpg")
+            #     cv2.imwrite(save_path, cv2.cvtColor(gallery_img, cv2.COLOR_RGB2BGR))
+            #     self.saved_count += 1
                
         
         # image transforms
@@ -213,17 +215,29 @@ class U1652DatasetEval(Dataset):
         self.ids = list(self.data_dict.keys())
                 
         self.transforms = transforms
-        
+        self.augmentation_sequences = [
+            iaa.Fog(),
+            iaa.Rain(drop_size=(0.1, 0.2), speed=(0.05, 0.2)),
+            iaa.Snowflakes(density=(0.01, 0.075), flake_size=(0.3, 0.8), speed=(0.008, 0.03)),
+            iaa.Sequential([iaa.Fog(), iaa.Rain()]),
+            iaa.Sequential([iaa.Fog(), iaa.Snowflakes()]),
+            iaa.Sequential([iaa.Rain(), iaa.Snowflakes()]),
+            iaa.Multiply((0.2, 0.6)),
+            iaa.Multiply((1.5, 2)),
+            iaa.MotionBlur(k=(7, 10), angle=[-90, 90])
+        ]
         self.given_sample_ids = sample_ids
         
         self.images = []
         self.sample_ids = []
         
         self.mode = mode
-        
+        self.saved_count = 0
         
         self.gallery_n = gallery_n
-        
+
+        self.rain = iaa.Rain(drop_size=(0.18, 0.3), speed=(0.05, 0.15))
+        self.snow = iaa.Snowflakes(density=(0.05, 0.1), flake_size=(0.4, 0.85), speed=(0.01, 0.02))
 
         for i, sample_id in enumerate(self.ids):
                 
@@ -239,31 +253,35 @@ class U1652DatasetEval(Dataset):
         
         
     def __getitem__(self, index):
-        
         img_path = self.images[index]
         sample_id = self.sample_ids[index]
         
         img = cv2.imread(img_path)
+
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
-        
-        #if self.mode == "sat":
-        
-        #    img90 = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-        #    img180 = cv2.rotate(img90, cv2.ROTATE_90_CLOCKWISE)
-        #    img270 = cv2.rotate(img180, cv2.ROTATE_90_CLOCKWISE)
-            
-        #    img_0_90 = np.concatenate([img, img90], axis=1)
-        #    img_180_270 = np.concatenate([img180, img270], axis=1)
-            
-        #    img = np.concatenate([img_0_90, img_180_270], axis=0)
-            
-        
-        
-        # image transforms
+        if self.saved_count ==0 or self.saved_count ==3 or self.saved_count ==4:  # Save only 3 images
+            print("img_path:",img_path)
+            save_path = os.path.join("/gpfs2/scratch/ychen57", f"origin_{self.saved_count}.jpg")
+            cv2.imwrite(save_path, img)
+        aug = random.choice(self.augmentation_sequences)
+
+        if self.saved_count ==0 or self.saved_count ==3 or self.saved_count ==4:  # Save only 3 images
+            snow_img = self.snow(image=img)
+            rain_img = self.rain(image=img)
+            save_snow_path = os.path.join("/gpfs2/scratch/ychen57", f"gallery_sonw_{self.saved_count}.jpg")
+            save_rain_path = os.path.join("/gpfs2/scratch/ychen57", f"gallery_rain_{self.saved_count}.jpg")
+            cv2.imwrite(save_snow_path, cv2.cvtColor(snow_img, cv2.COLOR_RGB2BGR))
+            cv2.imwrite(save_rain_path, cv2.cvtColor(rain_img, cv2.COLOR_RGB2BGR))
+        self.saved_count += 1
+        img = aug(image=img)
+
+        # Save augmented gallery images for checking
+
+
+            # image transforms
         if self.transforms is not None:
             img = self.transforms(image=img)['image']
-            
+
         label = int(sample_id)
         if self.given_sample_ids is not None:
             if sample_id not in self.given_sample_ids:
@@ -278,7 +296,7 @@ class U1652DatasetEval(Dataset):
         return set(self.sample_ids)
     
     
-def get_transforms(img_size,
+def                     get_transforms(img_size,
                    mean=[0.485, 0.456, 0.406],
                    std=[0.229, 0.224, 0.225]):
     

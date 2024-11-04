@@ -214,18 +214,7 @@ class U1652DatasetEval(Dataset):
         
         img = cv2.imread(img_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
-        
-        #if self.mode == "sat":
-        
-        #    img90 = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-        #    img180 = cv2.rotate(img90, cv2.ROTATE_90_CLOCKWISE)
-        #    img270 = cv2.rotate(img180, cv2.ROTATE_90_CLOCKWISE)
-            
-        #    img_0_90 = np.concatenate([img, img90], axis=1)
-        #    img_180_270 = np.concatenate([img180, img270], axis=1)
-            
-        #    img = np.concatenate([img_0_90, img_180_270], axis=0)
+
             
         
         

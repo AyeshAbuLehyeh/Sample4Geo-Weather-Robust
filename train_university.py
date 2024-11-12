@@ -9,13 +9,17 @@ from torch.cuda.amp import GradScaler
 from torch.utils.data import DataLoader
 from transformers import get_constant_schedule_with_warmup, get_polynomial_decay_schedule_with_warmup, get_cosine_schedule_with_warmup
 
-from sample4geo.dataset.university_weather import U1652DatasetEval, U1652DatasetTrain, get_transforms
+# from sample4geo.dataset.university import U1652DatasetEval,  get_transforms
+from sample4geo.dataset.university_weather import U1652DatasetTrain,U1652DatasetEval,get_transforms
 from sample4geo.utils import setup_system, Logger
 from sample4geo.trainer import train
 from sample4geo.evaluate.university import evaluate
 from sample4geo.loss import InfoNCE
 from sample4geo.model import TimmModel
 
+
+
+#updata Nov 6,adding loss_function2=torch.nn.MSELoss()
 
 @dataclass
 class Configuration:
@@ -30,13 +34,13 @@ class Configuration:
     mixed_precision: bool = True
     custom_sampling: bool = True         # use custom sampling instead of random
     seed = 1
-    epochs: int = 40
-    batch_size: int = 32                # keep in mind real_batch_size = 2 * batch_size
+    epochs: int = 20
+    batch_size: int = 16                # keep in mind real_batch_size = 2 * batch_size
     verbose: bool = True
-    gpu_ids: tuple = (0,1,2,3)           # GPU ids for training
+    gpu_ids: tuple = (0)           # GPU ids for training
     
     # Eval
-    batch_size_eval: int = 32
+    batch_size_eval: int = 16
     eval_every_n_epoch: int = 1          # eval every n Epoch
     normalize_features: bool = True
     eval_gallery_n: int = -1             # -1 for all or int
@@ -63,17 +67,17 @@ class Configuration:
     prob_flip: float = 0.5              # flipping the sat image and drone image simultaneously
 
     # Augment Images weather
-    prob_weather: float = 0.8              
+    prob_weather: float = 1.0
     
     # Savepath for model checkpoints
-    model_path: str = "./university"
+    model_path: str = "/gpfs2/scratch/ychen57/code/Geo-Localization-Weather-Conditions/model"
     
     # Eval before training
     zero_shot: bool = False
     
     # Checkpoint to start from
     #checkpoint_start = None
-    checkpoint_start = 'pretrained/pretrained/university/convnext_base.fb_in22k_ft_in1k_384/weights_e1_0.9515.pth'
+    checkpoint_start = '/gpfs2/scratch/aabulehy/geo_weather/pretrained/pretrained/university/convnext_base.fb_in22k_ft_in1k_384/weights_e1_0.9515.pth'
   
     # set num_workers to 0 if on Windows
     num_workers: int = 0 if os.name == 'nt' else 4 
@@ -229,9 +233,10 @@ if __name__ == '__main__':
     #-----------------------------------------------------------------------------#
 
     loss_fn = torch.nn.CrossEntropyLoss(label_smoothing=config.label_smoothing)
-    loss_function = InfoNCE(loss_function=loss_fn,
+    loss_function1 = InfoNCE(loss_function=loss_fn,
                             device=config.device,
                             )
+    loss_function2=torch.nn.MSELoss()
 
     if config.mixed_precision:
         scaler = GradScaler(init_scale=2.**10)
@@ -318,7 +323,7 @@ if __name__ == '__main__':
     #-----------------------------------------------------------------------------#
     start_epoch = 0   
     best_score = 0
-    
+    print("config:",config)
 
     for epoch in range(1, config.epochs+1):
         
@@ -328,7 +333,8 @@ if __name__ == '__main__':
         train_loss = train(config,
                            model,
                            dataloader=train_dataloader,
-                           loss_function=loss_function,
+                           loss_f1=loss_function1,
+                           loss_f2=loss_function2,
                            optimizer=optimizer,
                            scheduler=scheduler,
                            scaler=scaler)
@@ -342,7 +348,7 @@ if __name__ == '__main__':
         
             print("\n{}[{}]{}".format(30*"-", "Evaluate", 30*"-"))
         
-            r1_test = evaluate(config=config,
+            r1_test,res = evaluate(config=config,
                                model=model,
                                query_loader=query_dataloader_test,
                                gallery_loader=gallery_dataloader_test, 
@@ -353,7 +359,10 @@ if __name__ == '__main__':
             if r1_test > best_score:
 
                 best_score = r1_test
-
+                with open('best_result.txt', 'w') as f:
+                    f.write("config:"+f"{config}\n")
+                    f.write("r1:" + f"{r1_test}\n")
+                    f.write("res:" + f"{res}\n")
                 if torch.cuda.device_count() > 1 and len(config.gpu_ids) > 1:
                     torch.save(model.module.state_dict(), '{}/weights_e{}_{:.4f}.pth'.format(model_path, epoch, r1_test))
                 else:

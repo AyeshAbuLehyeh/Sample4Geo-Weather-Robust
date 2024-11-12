@@ -5,7 +5,8 @@ from .utils import AverageMeter
 from torch.cuda.amp import autocast
 import torch.nn.functional as F
 
-def train(train_config, model, dataloader, loss_function, optimizer, scheduler=None, scaler=None):
+#update Nov 6: loss_f2 is L2 loss function
+def train(train_config, model, dataloader, loss_f1,loss_f2, optimizer, scheduler=None, scaler=None):
 
     # set model train mode
     model.train()
@@ -26,7 +27,8 @@ def train(train_config, model, dataloader, loss_function, optimizer, scheduler=N
         bar = dataloader
     
     # for loop over one epoch
-    for query, reference, ids in bar:
+    # query_img, aug_query_img， gallery_img, idx
+    for query, aug_query,reference, ids in bar:
         
         if scaler:
             with autocast():
@@ -34,13 +36,15 @@ def train(train_config, model, dataloader, loss_function, optimizer, scheduler=N
                 # data (batches) to device   
                 query = query.to(train_config.device)
                 reference = reference.to(train_config.device)
-            
+                aug_query = aug_query.to(train_config.device)
                 # Forward pass
-                features1, features2 = model(query, reference)
+                features1, features1_aug_query,features2 = model(query,aug_img=aug_query, img2=reference)
                 if torch.cuda.device_count() > 1 and len(train_config.gpu_ids) > 1: 
-                    loss = loss_function(features1, features2, model.module.logit_scale.exp())
+                    loss = loss_f1(features1, features2, model.module.logit_scale.exp())
                 else:
-                    loss = loss_function(features1, features2, model.logit_scale.exp()) 
+                    loss = loss_f1(features1, features2, model.logit_scale.exp())
+                loss_supervised = loss_f2(features1,features1_aug_query)
+                loss+=loss_supervised
                 losses.update(loss.item())
                 
                   
@@ -67,13 +71,18 @@ def train(train_config, model, dataloader, loss_function, optimizer, scheduler=N
             # data (batches) to device   
             query = query.to(train_config.device)
             reference = reference.to(train_config.device)
-
+            aug_query = aug_query.to(train_config.device)
             # Forward pass
-            features1, features2 = model(query, reference)
+            features1, features2 = model(img1=query, img2=reference)
+            features1_aug_query = model(aug_query)
+
             if torch.cuda.device_count() > 1 and len(train_config.gpu_ids) > 1: 
-                loss = loss_function(features1, features2, model.module.logit_scale.exp())
+                loss = loss_f1(features1, features2, model.module.logit_scale.exp())
             else:
-                loss = loss_function(features1, features2, model.logit_scale.exp()) 
+                loss = loss_f1(features1, features2, model.logit_scale.exp())
+            loss_supervised = loss_f2(features1, features1_aug_query)
+
+            loss += loss_supervised
             losses.update(loss.item())
 
             # Calculate gradient using backward pass

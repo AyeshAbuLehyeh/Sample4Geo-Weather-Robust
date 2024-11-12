@@ -10,7 +10,7 @@ from tqdm import tqdm
 import time
 import random
 
-
+#updata nov 6:return query,reference,aug_reference
 def get_data(path):
     data = {}
     for root, dirs, files in os.walk(path, topdown=False):
@@ -28,7 +28,7 @@ class U1652DatasetTrain(Dataset):
                  gallery_folder,
                  transforms_query=None,
                  transforms_gallery=None,
-                 prob_flip=0.5, prob_weather=1.0,
+                 prob_flip=0.5, prob_weather=.5,
                  shuffle_batch_size=32):
         super().__init__()
  
@@ -95,25 +95,26 @@ class U1652DatasetTrain(Dataset):
         # Apply one of the augmentations uniformly at random to the gallery image
         if np.random.random() < self.prob_weather:
             aug = random.choice(self.augmentation_sequences)
-            gallery_img = aug(image=gallery_img)
+            aug_query_img = aug(image=query_img)
 
 
-            # # Save augmented gallery images for checking
-            # if self.saved_count < 3:  # Save only 3 images
-            #     print("gallery_img_path:",gallery_img_path)
-            #     save_path = os.path.join("/gpfs2/scratch/ychen57", f"gallery_aug_{self.saved_count}.jpg")
-            #     cv2.imwrite(save_path, cv2.cvtColor(gallery_img, cv2.COLOR_RGB2BGR))
-            #     self.saved_count += 1
+            # Save augmented gallery images for checking
+            if self.saved_count < 3:  # Save only 3 images
+                print("img_path:",query_img_path)
+                save_path = os.path.join("/gpfs2/scratch/ychen57", f"aug_query_{self.saved_count}.jpg")
+                cv2.imwrite(save_path, cv2.cvtColor(aug_query_img, cv2.COLOR_RGB2BGR))
+                self.saved_count += 1
                
         
         # image transforms
         if self.transforms_query is not None:
             query_img = self.transforms_query(image=query_img)['image']
+            aug_query_img = self.transforms_query(image = aug_query_img)['image']
             
         if self.transforms_gallery is not None:
             gallery_img = self.transforms_gallery(image=gallery_img)['image']
-        
-        return query_img, gallery_img, idx
+
+        return query_img, aug_query_img,gallery_img, idx
 
     def __len__(self):
         return len(self.samples)
@@ -213,7 +214,7 @@ class U1652DatasetEval(Dataset):
 
         # use only folders that exists for both gallery and query
         self.ids = list(self.data_dict.keys())
-                
+
         self.transforms = transforms
         self.augmentation_sequences = [
             iaa.Fog(),
@@ -236,9 +237,6 @@ class U1652DatasetEval(Dataset):
         
         self.gallery_n = gallery_n
 
-        self.rain = iaa.Rain(drop_size=(0.18, 0.3), speed=(0.05, 0.15))
-        self.snow = iaa.Snowflakes(density=(0.05, 0.1), flake_size=(0.4, 0.85), speed=(0.01, 0.02))
-
         for i, sample_id in enumerate(self.ids):
                 
             for j, file in enumerate(self.data_dict[sample_id]["files"]):
@@ -259,20 +257,20 @@ class U1652DatasetEval(Dataset):
         img = cv2.imread(img_path)
 
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        if self.saved_count ==0 or self.saved_count ==3 or self.saved_count ==4:  # Save only 3 images
-            print("img_path:",img_path)
-            save_path = os.path.join("/gpfs2/scratch/ychen57", f"origin_{self.saved_count}.jpg")
-            cv2.imwrite(save_path, img)
+        # if self.saved_count ==0 or self.saved_count ==3 or self.saved_count ==4:  # Save only 3 images
+        #     print("img_path:",img_path)
+        #     save_path = os.path.join("/gpfs2/scratch/ychen57", f"origin_{self.saved_count}.jpg")
+        #     cv2.imwrite(save_path, img)
         aug = random.choice(self.augmentation_sequences)
 
-        if self.saved_count ==0 or self.saved_count ==3 or self.saved_count ==4:  # Save only 3 images
-            snow_img = self.snow(image=img)
-            rain_img = self.rain(image=img)
-            save_snow_path = os.path.join("/gpfs2/scratch/ychen57", f"gallery_sonw_{self.saved_count}.jpg")
-            save_rain_path = os.path.join("/gpfs2/scratch/ychen57", f"gallery_rain_{self.saved_count}.jpg")
-            cv2.imwrite(save_snow_path, cv2.cvtColor(snow_img, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(save_rain_path, cv2.cvtColor(rain_img, cv2.COLOR_RGB2BGR))
-        self.saved_count += 1
+        # if self.saved_count ==0 or self.saved_count ==3 or self.saved_count ==4:  # Save only 3 images
+        #     snow_img = self.snow(image=img)
+        #     rain_img = self.rain(image=img)
+        #     save_snow_path = os.path.join("/gpfs2/scratch/ychen57", f"gallery_sonw_{self.saved_count}.jpg")
+        #     save_rain_path = os.path.join("/gpfs2/scratch/ychen57", f"gallery_rain_{self.saved_count}.jpg")
+        #     cv2.imwrite(save_snow_path, cv2.cvtColor(snow_img, cv2.COLOR_RGB2BGR))
+        #     cv2.imwrite(save_rain_path, cv2.cvtColor(rain_img, cv2.COLOR_RGB2BGR))
+        # self.saved_count += 1
         img = aug(image=img)
 
         # Save augmented gallery images for checking

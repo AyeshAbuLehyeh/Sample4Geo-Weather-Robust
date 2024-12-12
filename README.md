@@ -1,3 +1,5 @@
+## [Note]Here is our best model's weight, please download by OneDrive: [link](https://uvmoffice-my.sharepoint.com/:u:/g/personal/ychen57_uvm_edu/Ebcvr5nbFaZEjj6XylsnjuQB8qupozaCrZNkejmdwztWKw?e=bo9pFE)
+
 # Sample4Geo: Hard Negative Sampling For Cross-View Geo-Localisation
 
 In this repository we present our ICCV accepted work: "Sample4Geo: Hard Negative Sampling For Cross-View Geo-Localisation" and provide training and inference code. 

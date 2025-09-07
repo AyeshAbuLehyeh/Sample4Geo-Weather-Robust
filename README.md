@@ -1,4 +1,7 @@
-## [Note]Here is our best model's weight, please download by OneDrive: [link](https://uvmoffice-my.sharepoint.com/:u:/g/personal/ychen57_uvm_edu/Ebcvr5nbFaZEjj6XylsnjuQB8qupozaCrZNkejmdwztWKw?e=bo9pFE)
+Overview
+This repository is an extension of the work Sample4Geo. We extend their method to improve cross-view geo-localization performance under challenging weather conditions such as rain, snow, and fog.
+
+This implementation is built in PyTorch and is based on the official code provided by the Sample4Geo authors.
 
 # Sample4Geo: Hard Negative Sampling For Cross-View Geo-Localisation
 
@@ -16,8 +19,6 @@ In this repository we present our ICCV accepted work: "Sample4Geo: Hard Negative
 
 
 [Paper](https://arxiv.org/abs/2303.11851) 
-
-[Weights](https://drive.google.com/drive/folders/1PMuUqvDnCb216D8_ZDDJzDD3FxeH5BoA?usp=drive_link)
 
 ![](images/sample4geo_approach.jpg)
 *Sample4Geo Architecture*
